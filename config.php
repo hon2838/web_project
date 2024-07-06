@@ -2,7 +2,7 @@
 // Database connection details
 $servername = "localhost";
 $username = "root";
-$password = "Wzx0509@";
+$password = "";
 $dbname = "web_project_db";
 
 // Create connection
