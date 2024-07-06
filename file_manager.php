@@ -28,8 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['upload'])) {
     }
 
     // Allow only certain file formats
-    if ($fileType != "jpg" && $fileType != "png" && $fileType != "jpeg"
-        && $fileType != "gif") {
+    if ($fileType != "jpg" && $fileType != "png" && $fileType != "jpeg" && $fileType != "gif") {
         echo "Sorry, only JPG, JPEG, PNG & GIF files are allowed.";
         $uploadOk = 0;
     }
@@ -37,7 +36,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['upload'])) {
     // Check if $uploadOk is set to 0 by an error
     if ($uploadOk == 0) {
         echo "Sorry, your file was not uploaded.";
-        // if everything is ok, try to upload file
     } else {
         if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) {
             // Insert file details into user_files table
@@ -103,6 +101,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Manager</title>
     <link rel="stylesheet" href="css/bootstrap.css">
+    <script src="jquery-3.7.1.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 </head>
 
 <body>
@@ -119,7 +119,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete'])) {
         <h3 class="mt-4">Uploaded Files:</h3>
         <ul class="list-group">
             <?php
-            // Fetch and display files uploaded by the user
             $sql_files = "SELECT id, filename FROM user_files WHERE user_id = ?";
             $stmt_files = $conn->prepare($sql_files);
             $stmt_files->bind_param("i", $_SESSION['id']);
@@ -128,7 +127,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete'])) {
 
             while ($stmt_files->fetch()) {
                 echo '<li class="list-group-item">' . htmlspecialchars($filename) . ' 
-                      <a href="files/' . htmlspecialchars($filename) . '" class="btn btn-sm btn-primary mx-2" download>Download</a>
+                      <button class="btn btn-sm btn-primary mx-2 download-btn" data-filename="' . htmlspecialchars($filename) . '">Download</button>
                       <form action="delete.php" method="post" class="d-inline">
                           <input type="hidden" name="file_id" value="' . $file_id . '">
                           <button type="submit" name="delete" class="btn btn-sm btn-danger">Delete</button>
@@ -142,6 +141,53 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete'])) {
 
         <a href="logout.php" class="btn btn-danger mt-4">Logout</a>
     </div>
+
+    <!-- OTP Modal -->
+    <div class="modal fade" id="otpModal" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="otpModalLabel">Enter OTP</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="otpForm">
+                        <div class="mb-3">
+                            <label for="otp" class="form-label">OTP</label>
+                            <input type="text" class="form-control" id="otp" name="otp" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Verify</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            var downloadFile;
+
+            $('.download-btn').on('click', function() {
+                downloadFile = $(this).data('filename');
+                $.post('send_otp.php', { email: '<?php echo $_SESSION['email']; ?>' }, function(response) {
+                    alert(response);
+                    $('#otpModal').modal('show');
+                });
+            });
+
+            $('#otpForm').on('submit', function(e) {
+                e.preventDefault();
+                var otp = $('#otp').val();
+                $.post('verify_otp.php', { otp: otp, filename: downloadFile }, function(response) {
+                    if (response === 'verified') {
+                        window.location.href = 'files/' + downloadFile;
+                    } else {
+                        alert('Invalid OTP. Please try again.');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
