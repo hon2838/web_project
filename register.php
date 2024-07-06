@@ -1,50 +1,141 @@
 <?php
 session_start();
-include_once 'includes/db_connection.php';
+require_once 'config.php'; // Adjust the path if necessary
 
+// Initialize variables for form validation
+$username = $password = $confirm_password = '';
+$username_err = $password_err = $confirm_password_err = '';
+
+// Processing form data when form is submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
 
-    // Validate and insert new user
-    $sql = "INSERT INTO users (username, password) VALUES ('$username', '$password')";
-    if ($conn->query($sql) === TRUE) {
-        $_SESSION['loggedin'] = true;
-        $_SESSION['username'] = $username;
-        header("Location: dashboard.php");
-        exit;
+    // Validate username
+    if (empty(trim($_POST["username"]))) {
+        $username_err = "Please enter a username.";
     } else {
-        $registration_error = "Error: " . $sql . "<br>" . $conn->error;
+        // Prepare a select statement
+        $sql = "SELECT id FROM users WHERE username = ?";
+
+        if ($stmt = $conn->prepare($sql)) {
+            // Bind variables to the prepared statement as parameters
+            $stmt->bind_param("s", $param_username);
+
+            // Set parameters
+            $param_username = trim($_POST["username"]);
+
+            // Attempt to execute the prepared statement
+            if ($stmt->execute()) {
+                // Store result
+                $stmt->store_result();
+
+                if ($stmt->num_rows == 1) {
+                    $username_err = "This username is already taken.";
+                } else {
+                    $username = trim($_POST["username"]);
+                }
+            } else {
+                echo "Oops! Something went wrong. Please try again later.";
+            }
+
+            // Close statement
+            $stmt->close();
+        }
     }
+
+    // Validate password
+    if (empty(trim($_POST['password']))) {
+        $password_err = "Please enter a password.";
+    } elseif (strlen(trim($_POST['password'])) < 6) {
+        $password_err = "Password must have at least 6 characters.";
+    } else {
+        $password = trim($_POST['password']);
+    }
+
+    // Validate confirm password
+    if (empty(trim($_POST["confirm_password"]))) {
+        $confirm_password_err = "Please confirm password.";
+    } else {
+        $confirm_password = trim($_POST['confirm_password']);
+        if (empty($password_err) && ($password != $confirm_password)) {
+            $confirm_password_err = "Password did not match.";
+        }
+    }
+
+    // Check input errors before inserting into database
+    if (empty($username_err) && empty($password_err) && empty($confirm_password_err)) {
+
+        // Prepare an insert statement
+        $sql = "INSERT INTO users (username, password) VALUES (?, ?)";
+
+        if ($stmt = $conn->prepare($sql)) {
+            // Bind variables to the prepared statement as parameters
+            $stmt->bind_param("ss", $param_username, $param_password);
+
+            // Set parameters
+            $param_username = $username;
+            $param_password = password_hash($password, PASSWORD_DEFAULT); // Creates a password hash
+
+            // Attempt to execute the prepared statement
+            if ($stmt->execute()) {
+                // Redirect to login page
+                header("location: login.php");
+            } else {
+                echo "Something went wrong. Please try again later.";
+            }
+
+            // Close statement
+            $stmt->close();
+        }
+    }
+
+    // Close connection
+    $conn->close();
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register</title>
     <link rel="stylesheet" href="css/bootstrap.css">
+    <style>
+        .form-container {
+            max-width: 400px;
+            margin: auto;
+            margin-top: 20px;
+        }
+    </style>
 </head>
+
 <body>
     <div class="container">
-        <h2>Register</h2>
-        <?php if (isset($registration_error)): ?>
-            <div class="alert alert-danger"><?php echo $registration_error; ?></div>
-        <?php endif; ?>
-        <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" class="form-control" id="username" name="username" required>
+        <h2 class="text-center">Register</h2>
+        <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+            <div class="form-group <?php echo (!empty($username_err)) ? 'has-error' : ''; ?>">
+                <label>Username</label>
+                <input type="text" name="username" class="form-control" value="<?php echo $username; ?>">
+                <span class="help-block"><?php echo $username_err; ?></span>
+            </div>
+            <div class="form-group <?php echo (!empty($password_err)) ? 'has-error' : ''; ?>">
+                <label>Password</label>
+                <input type="password" name="password" class="form-control" value="<?php echo $password; ?>">
+                <span class="help-block"><?php echo $password_err; ?></span>
+            </div>
+            <div class="form-group <?php echo (!empty($confirm_password_err)) ? 'has-error' : ''; ?>">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" class="form-control" value="<?php echo $confirm_password; ?>">
+                <span class="help-block"><?php echo $confirm_password_err; ?></span>
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
+                <input type="submit" class="btn btn-primary" value="Register">
+                <input type="reset" class="btn btn-default" value="Reset">
             </div>
-            <button type="submit" class="btn btn-primary">Register</button>
-            <a href="index.php" class="btn btn-link">Login</a>
+            <p>Already have an account? <a href="login.php">Login here</a>.</p>
         </form>
     </div>
 </body>
+
 </html>
